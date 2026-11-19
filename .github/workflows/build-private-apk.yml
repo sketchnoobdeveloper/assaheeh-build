@@ -162,8 +162,15 @@ jobs:
         run: |
           set -euo pipefail
           chmod +x gradlew
-          ./gradlew "${{ steps.detect.outputs.assemble_task }}" --no-daemon --max-workers=2 --stacktrace \
-            -Pkotlin.compiler.execution.strategy=in-process
+          # Keep the public log free of compiler messages that quote private
+          # source paths. On failure, surface only the error lines for debugging.
+          BUILD_LOG="${RUNNER_TEMP}/assaheeh-gradle.log"
+          if ! ./gradlew "${{ steps.detect.outputs.assemble_task }}" --no-daemon --max-workers=2 --stacktrace \
+            -Pkotlin.compiler.execution.strategy=in-process > "$BUILD_LOG" 2>&1; then
+            grep -iE 'error|exception|what went wrong|execution failed|caused by' "$BUILD_LOG" || true
+            exit 1
+          fi
+          echo "Gradle build finished successfully (full compiler output kept on the runner only)."
 
       - name: Verify APK output
         id: apk
