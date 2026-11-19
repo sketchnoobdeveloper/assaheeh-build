@@ -86,11 +86,15 @@ jobs:
           # Android application module, discovered from the checkout.
           APP_MODULE=""
           while IFS= read -r file; do
-            if grep -qE 'com\.android\.application|alias\(libs\.plugins\.android\.application\)' "$file"; then
+            # The root build file declares the plugin with `apply false`; it is not
+            # the Android application module.
+            case "$file" in ./build.gradle|./build.gradle.kts) continue ;; esac
+            if grep -qE 'com\.android\.application|alias\(libs\.plugins\.android\.application\)' "$file" \
+               && ! grep -qE 'apply[[:space:]]+false' "$file"; then
               APP_MODULE=$(basename "$(dirname "$file")")
               break
             fi
-          done < <(find . -maxdepth 3 \( -name 'build.gradle.kts' -o -name 'build.gradle' \) -type f)
+          done < <(find . -mindepth 2 -maxdepth 3 \( -name 'build.gradle.kts' -o -name 'build.gradle' \) -type f)
           APP_MODULE=${APP_MODULE:-app}
 
           {
