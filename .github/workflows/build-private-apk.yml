@@ -155,6 +155,8 @@ jobs:
         shell: bash
         working-directory: source
         env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           GRADLE_OPTS: >-
             -Dorg.gradle.jvmargs="-Xmx4096m -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8"
             -Dorg.gradle.workers.max=2
