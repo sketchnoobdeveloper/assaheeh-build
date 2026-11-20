@@ -191,7 +191,7 @@ jobs:
           TEST_LOG="${RUNNER_TEMP}/assaheeh-tests.log"
           if ! ./gradlew :app:testDebugUnitTest --no-daemon --max-workers=2 \
             -Pkotlin.compiler.execution.strategy=in-process > "$TEST_LOG" 2>&1; then
-            grep -iE 'failed|failure|error|exception' "$TEST_LOG" | head -40 || true
+            grep -iE '^e:|e: file|unresolved|type mismatch|failed|failure|error|exception' "$TEST_LOG" | head -60 || true
             exit 1
           fi
           echo "Unit tests passed (full output kept on the runner only)." >> "$GITHUB_STEP_SUMMARY"
