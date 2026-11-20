@@ -169,7 +169,7 @@ jobs:
           BUILD_LOG="${RUNNER_TEMP}/assaheeh-gradle.log"
           if ! ./gradlew "${{ steps.detect.outputs.assemble_task }}" --no-daemon --max-workers=2 --stacktrace \
             -Pkotlin.compiler.execution.strategy=in-process > "$BUILD_LOG" 2>&1; then
-            grep -iE 'error|exception|what went wrong|execution failed|caused by' "$BUILD_LOG" || true
+            grep -iE '^e:|e: file|error|exception|unresolved|type mismatch|what went wrong|execution failed|caused by' "$BUILD_LOG" || true
             exit 1
           fi
           echo "Gradle build finished successfully (full compiler output kept on the runner only)."
