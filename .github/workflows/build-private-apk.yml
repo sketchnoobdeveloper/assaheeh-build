@@ -174,6 +174,28 @@ jobs:
           fi
           echo "Gradle build finished successfully (full compiler output kept on the runner only)."
 
+      - name: Unit tests (remote verification)
+        shell: bash
+        working-directory: source
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          GRADLE_OPTS: >-
+            -Dorg.gradle.jvmargs="-Xmx4096m -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8"
+            -Dorg.gradle.workers.max=2
+            -Dorg.gradle.parallel=false
+        run: |
+          set -euo pipefail
+          # Keep private source paths out of the public log; only a short verdict
+          # and the Gradle test summary are surfaced.
+          TEST_LOG="${RUNNER_TEMP}/assaheeh-tests.log"
+          if ! ./gradlew :app:testDebugUnitTest --no-daemon --max-workers=2 \
+            -Pkotlin.compiler.execution.strategy=in-process > "$TEST_LOG" 2>&1; then
+            grep -iE 'failed|failure|error|exception' "$TEST_LOG" | head -40 || true
+            exit 1
+          fi
+          echo "Unit tests passed (full output kept on the runner only)." >> "$GITHUB_STEP_SUMMARY"
+
       - name: Verify APK output
         id: apk
         shell: bash
