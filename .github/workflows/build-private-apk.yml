@@ -14,6 +14,11 @@ on:
         required: false
         default: 'main'
         type: string
+      release_build:
+        description: 'Also build a signed release APK (uses release signing secrets)'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -221,5 +226,61 @@ jobs:
         with:
           name: assaheeh-debug-apks
           path: source/${{ steps.apk.outputs.dir }}/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Build signed release APK
+        if: ${{ inputs.release_build }}
+        shell: bash
+        working-directory: source
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          KEYSTORE_B64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          GRADLE_OPTS: >-
+            -Dorg.gradle.jvmargs="-Xmx4096m -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8"
+            -Dorg.gradle.workers.max=2
+            -Dorg.gradle.parallel=false
+        run: |
+          set -euo pipefail
+          if [ -z "$KEYSTORE_B64" ]; then echo "::error::RELEASE_KEYSTORE_BASE64 is missing"; exit 1; fi
+          KS="$RUNNER_TEMP/assaheeh-release.jks"
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$KS"
+          BUILD_LOG="${RUNNER_TEMP}/assaheeh-release.log"
+          if ! ./gradlew :app:assembleRelease --no-daemon --max-workers=2 --stacktrace \
+            -Pandroid.injected.signing.store.file="$KS" \
+            -Pandroid.injected.signing.store.password="$STORE_PASSWORD" \
+            -Pandroid.injected.signing.key.alias="$KEY_ALIAS" \
+            -Pandroid.injected.signing.key.password="$KEY_PASSWORD" \
+            -Pkotlin.compiler.execution.strategy=in-process > "$BUILD_LOG" 2>&1; then
+            grep -iE '^e:|e: file|error|exception|what went wrong|execution failed|caused by' "$BUILD_LOG" | head -60 || true
+            exit 1
+          fi
+          echo "Signed release build finished (full log kept on the runner only)."
+
+      - name: Verify release APK
+        id: release_apk
+        if: ${{ inputs.release_build }}
+        shell: bash
+        working-directory: source
+        run: |
+          set -euo pipefail
+          APK_DIR="app/build/outputs/apk/release"
+          APK=$(find "$APK_DIR" -type f -name '*.apk' 2>/dev/null | head -1)
+          if [ -z "$APK" ]; then echo "::error::No signed release APK produced"; exit 1; fi
+          APK_NAME=$(basename "$APK")
+          echo "name=$APK_NAME" >> "$GITHUB_OUTPUT"
+          echo "### Signed release" >> "$GITHUB_STEP_SUMMARY"
+          echo "- ${APK_NAME} ($(du -h "$APK" | cut -f1))" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload signed release artifact
+        if: ${{ inputs.release_build }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: assaheeh-release-signed
+          path: source/app/build/outputs/apk/release/${{ steps.release_apk.outputs.name }}
           if-no-files-found: error
           retention-days: 14
