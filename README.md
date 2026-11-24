@@ -30,3 +30,11 @@ repository access: **Only select repositories → AsSaheeh**, permissions:
 - The workflow never prints source files. Only discovered version numbers, the
   build task and produced APK filenames/sizes go to the public step summary.
 - The published artifact contains debug APKs only.
+
+## Release build
+Send `release_build: true` with the manual dispatch to also produce a signed release APK
+(`assaheeh-release-signed` artifact). Signing uses these repository secrets:
+`RELEASE_KEYSTORE_BASE64`, `RELEASE_STORE_PASSWORD`, `RELEASE_KEY_ALIAS`, `RELEASE_KEY_PASSWORD`.
+
+The upload key was generated locally and is stored only as encrypted GitHub secrets. Save a copy
+from GitHub Settings → Secrets before rotating/removing them; losing it prevents future app updates.
